@@ -1,6 +1,6 @@
 PYTHON ?= python
 ifeq ($(origin VIRTUAL_ENV), undefined)
-    DIST_PYTHON ?= pipenv run $(PYTHON)
+    DIST_PYTHON ?= poetry run $(PYTHON)
 else
     DIST_PYTHON ?= $(PYTHON)
 endif
@@ -8,7 +8,8 @@ endif
 NAME = ansible-runner
 IMAGE_NAME ?= $(NAME)
 PIP_NAME = ansible_runner
-VERSION := $(shell $(DIST_PYTHON) setup.py --version)
+LONG_VERSION := $(shell poetry version)
+VERSION := $(filter-out $(NAME), $(LONG_VERSION))
 ifeq ($(OFFICIAL),yes)
     RELEASE ?= 1
 else
@@ -69,21 +70,26 @@ clean:
 	rm -rf ansible-runner.egg-info
 	rm -rf rpm-build
 	rm -rf deb-build
+	rm -f setup.py
 	find . -type f -regex ".*\py[co]$$" -delete
 
 dist:
-	$(DIST_PYTHON) setup.py bdist_wheel --universal
+	poetry build
 
 sdist: dist/$(NAME)-$(VERSION).tar.gz
 
+# Generate setup.py transiently for the sdist so we don't have to deal with
+# packaging poetry as a RPM for rpm build time dependencies.
 dist/$(NAME)-$(VERSION).tar.gz:
-	$(DIST_PYTHON) setup.py sdist
+	$(PYTHON) packaging/poetry-gen-setup.py
+	poetry build -f sdist
+	rm -f setup.py
 
 dev:
-	pipenv install
+	poetry install
 
 shell:
-	pipenv shell
+	poetry shell
 
 test:
 	tox
