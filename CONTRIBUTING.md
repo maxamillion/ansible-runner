@@ -27,3 +27,13 @@ This will automatically setup the development environment under a virtualenv, wh
 ## Linting and Unit Tests
 
 `tox` is used to run linters (`flake8` and `yamllint`) and unit tests on both Python 2 and 3. It uses poetry to bootstrap these two environments.
+
+## A note about setup.py
+
+In this repository you will find a [`setup.py` file](https://docs.python.org/3/installing/index.html#installing-index),
+this file should never be touched by hand. There is a python script located at
+`packaging/poetry-gen-setup.py` which will generate the `setup.py`. If in the
+event you need to add or alter the `pyproject.toml` file along with your
+changes, please generate a new `setup.py` and include it in your pull request.
+This allows the Ansible Runner codebase to be compatible with build and release
+systems that do not yet support [Poetry](https://python-poetry.org/).
