@@ -177,6 +177,11 @@ def print_common_usage():
                 ansible-runner run . -r role_name --hosts myhost
                 ansible-runner run . -m command -a "ls -l" --hosts myhost
 
+            run ansible execution environments:
+
+                ansible-runner adhoc myhosts -m ping
+                ansible-runner playbook my_playbook.yml
+
         `ansible-runner --help` list of optional command line arguments
     """))
 
@@ -207,7 +212,7 @@ def main(sys_args=None):
 
     parser.add_argument(
         "command",
-        choices=["run", "start", "stop", "is-alive"],
+        choices=["run", "start", "stop", "is-alive", "adhoc", "playbook"],
         metavar="COMMAND",
         help="command directive for controlling ansible-runner execution "
              "(one of 'run', 'start', 'stop', 'is-alive')"
@@ -339,6 +344,21 @@ def main(sys_args=None):
         action="count",
         help="increase the verbosity with multiple v's (up to 5) of the "
              "ansible-playbook output (default=None)"
+    )
+
+    # FIXME FIXME - this should probably be a reasonable default
+    runner_group.add_argument(
+        '--exec-env',
+        dest='container_image',
+        default='execenv',
+        help="Container image name containing an Ansible Execution Environment"
+    )
+
+    runner_group.add_argument(
+        '--container-runtime',
+        dest='container_runtime',
+        default='podman',
+        help="OCI Compliant container runtime to use. Examples: podman, docker"
     )
 
     # Receptor options
@@ -528,6 +548,7 @@ def main(sys_args=None):
         dest='resource_profiling_results_dir',
         help="Directory where profiling data files should be saved. Defaults to None (profiling_data folder under private data dir is used in this case).")
 
+
     if len(sys.argv) == 1:
         parser.print_usage()
         print_common_usage()
@@ -578,7 +599,7 @@ def main(sys_args=None):
         if not os.path.exists(stderr_path):
             os.close(os.open(stderr_path, os.O_CREAT, stat.S_IRUSR | stat.S_IWUSR))
 
-    if args.command in ('start', 'run'):
+    if args.command in ('start', 'run', 'adhoc', 'playbook'):
 
         if args.command == 'start':
             import daemon
@@ -586,6 +607,12 @@ def main(sys_args=None):
             context = daemon.DaemonContext(pidfile=TimeoutPIDLockFile(pidfile))
         else:
             context = threading.Lock()
+
+        if args.command in ('adhoc', 'playbook'):
+            containerized = True
+        else:
+            containerized = False
+
 
         with context:
             with role_manager(args) as args:
@@ -624,7 +651,11 @@ def main(sys_args=None):
                                    limit=args.limit,
                                    via_receptor=args.via_receptor,
                                    receptor_peer=args.receptor_peer,
-                                   receptor_node_id=args.receptor_node_id)
+                                   receptor_node_id=args.receptor_node_id,
+                                   containerized=containerized,
+                                   container_runtime=args.container_runtime,
+                                   container_image=args.container_image
+                                   )
                 if args.cmdline:
                     run_options['cmdline'] = args.cmdline
 
