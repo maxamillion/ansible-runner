@@ -199,6 +199,7 @@ def main(sys_args=None):
     :rtype: SystemExit
     """
     parser = argparse.ArgumentParser(
+        prog='ansible-runner',
         description="Use 'ansible-runner' (with no arguments) to see basic usage"
     )
 
@@ -215,7 +216,7 @@ def main(sys_args=None):
         choices=["run", "start", "stop", "is-alive", "adhoc", "playbook"],
         metavar="COMMAND",
         help="command directive for controlling ansible-runner execution "
-             "(one of 'run', 'start', 'stop', 'is-alive')"
+             "(one of 'run', 'start', 'stop', 'is-alive', 'adhoc', 'playbook')"
         #help="command directive controlling ansible-runner execution"
     )
 
@@ -547,7 +548,6 @@ def main(sys_args=None):
         "--resource-profiling-results-dir",
         dest='resource_profiling_results_dir',
         help="Directory where profiling data files should be saved. Defaults to None (profiling_data folder under private data dir is used in this case).")
-
 
     if len(sys.argv) == 1:
         parser.print_usage()
