@@ -408,6 +408,16 @@ DEFAULT_CLI_ARGS = {
                 help="Directory where profiling data files should be saved. Defaults to None (profiling_data folder under private data dir is used in this case)."
             )
         )
+    ),
+    "modules_group": (
+        (
+            ("-a", "--args",),
+            dict(
+                dest='module_args',
+                help="set of arguments to be passed to the module at run time in the "
+                     "form of 'key1=value1 key2=value2 keyN=valueN'(default=None)"
+            )
+        ),
     )
 }
 
@@ -690,23 +700,29 @@ def main(sys_args=None):
 
     # modules groups
 
-    modules_group = parser.add_argument_group(
-        "Ansible Module Options",
-        "configuration options for directly executing Ansible modules"
+    modules_group_options = (
+        (
+            "Ansible Module Options",
+            "configuration options for directly executing Ansible modules",
+        ),
+        {}
     )
-
-    modules_group.add_argument(
-        "-a", "--args",
-        dest='module_args',
-        help="set of arguments to be passed to the module at run time in the "
-             "form of 'key1=value1 key2=value2 keyN=valueN'(default=None)"
-    )
+    run_modules_group = run_subparser.add_argument_group(*modules_group_options)
+    start_modules_group = start_subparser.add_argument_group(*modules_group_options)
+    stop_modules_group = stop_subparser.add_argument_group(*modules_group_options)
+    isalive_modules_group = isalive_subparser.add_argument_group(*modules_group_options)
+    adhoc_modules_group = adhoc_subparser.add_argument_group(*modules_group_options)
+    add_args_to_parser(run_modules_group, DEFAULT_CLI_ARGS['modules_group'])
+    add_args_to_parser(start_modules_group, DEFAULT_CLI_ARGS['modules_group'])
+    add_args_to_parser(stop_modules_group, DEFAULT_CLI_ARGS['modules_group'])
+    add_args_to_parser(isalive_modules_group, DEFAULT_CLI_ARGS['modules_group'])
+    add_args_to_parser(adhoc_modules_group, DEFAULT_CLI_ARGS['modules_group'])
 
     # playbook options
     playbook_group_options = (
         (
             "Ansible Playbook Options",
-            "configuation options for executing Ansible playbooks"
+            "configuation options for executing Ansible playbooks",
         ),
         {},
     )
