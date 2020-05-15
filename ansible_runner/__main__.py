@@ -186,6 +186,22 @@ def print_common_usage():
     """))
 
 
+def add_args_to_parser(parser, args):
+    """
+    Traverse a tuple of argments to add to a parser
+
+    :param parser: Instance of a parser, subparser, or argument group
+    :type sys_args: argparse.ArgumentParser
+
+    :param args: Tuple of tuples, format ((arg1, arg2), {'kwarg1':'val1'},)
+    :type sys_args: tuple
+
+    :returns: None
+    """
+    for arg in args:
+        parser.add_argument(*arg[0], **arg[1])
+
+
 def main(sys_args=None):
     """Main entry point for ansible-runner executable
 
@@ -198,9 +214,159 @@ def main(sys_args=None):
     :returns: an instance of SystemExit
     :rtype: SystemExit
     """
+
     parser = argparse.ArgumentParser(
         prog='ansible-runner',
         description="Use 'ansible-runner' (with no arguments) to see basic usage"
+    )
+    subparser = parser.add_subparsers(
+        help="Command to invoke",
+        dest='command',
+        description="COMMAND PRIVATE_DATA_DIR [ARGS]"
+    )
+
+    runner_arg_defs = (
+        # ansible-runner options
+        (
+            ("--debug",),
+            {
+                'action': "store_true",
+                'help': "enable ansible-runner debug output logging (default=False)"
+            },
+        ),
+        (
+            ("--logfile",),
+            {
+                'help': "log output messages to a file (default=None)"
+            },
+        ),
+        (
+            ("-b", "--binary",),
+            {
+                'default': DEFAULT_RUNNER_BINARY,
+                'help': "specifies the full path pointing to the Ansible binaries "
+                        "(default={})".format(DEFAULT_RUNNER_BINARY)
+            },
+        ),
+        (
+            ("-i", "--ident",),
+            {
+                'default': DEFAULT_UUID,
+                'help': "an identifier that will be used when generating the artifacts "
+                        "directory and can be used to uniquely identify a playbook run "
+                        "(default={})".format(DEFAULT_UUID)
+            },
+        ),
+        (
+            ("--rotate-artifacts",),
+            {
+                'default': 0,
+                'type': int,
+                'help': "automatically clean up old artifact directories after a given "
+                        "number have been created (default=0, disabled)"
+            },
+        ),
+        (
+            ("--artifact-dir",),
+            {
+                'help': "optional path for the artifact root directory "
+                        "(default=<private_data_dir>/artifacts)"
+            },
+        ),
+        (
+            ("--project-dir",),
+            {
+                'help': "optional path for the location of the playbook content directory "
+                        "(default=<private_data_dir/project)"
+            },
+        ),
+        (
+            ("--inventory",),
+            {
+                'help': "optional path for the location of the inventory content directory "
+                        "(default=<private_data_dir>/inventory)"
+            },
+        ),
+        (
+            ("-j", "--json",),
+            {
+                'action': "store_true",
+                'help': "output the JSON event structure to stdout instead of "
+                        "Ansible output (default=False)"
+            },
+        ),
+        (
+            ("--omit-event-data",),
+            {
+                'action': "store_true",
+                'help': "Omits including extra event data in the callback payloads "
+                        "or the Runner payload data files "
+                        "(status and stdout still included)"
+            },
+        ),
+        (
+            ("--only-failed-event-data",),
+            {
+                'action': "store_true",
+                'help': "Only adds extra event data for failed tasks in the callback "
+                        "payloads or the Runner payload data files "
+                        "(status and stdout still included for other events)"
+            },
+        ),
+        (
+            ("-q", "--quiet",),
+            {
+                'action': "store_true",
+                'help': "disable all messages sent to stdout/stderr (default=False)"
+            },
+        ),
+        (
+            ("-v",),
+            {
+                'action': "count",
+                'help': "increase the verbosity with multiple v's (up to 5) of the "
+                        "ansible-playbook output (default=None)"
+            },
+        ),
+        (
+            ('--exec-env',), # FIXME FIXME - this should probably be a reasonable default
+            {
+                'dest': 'container_image',
+                'default': 'execenv',
+                'help': "Container image name containing an Ansible Execution Environment"
+            },
+        ),
+        (
+            ('--container-runtime',),
+            {
+                'dest': 'container_runtime',
+                'default': 'podman',
+                'help': "OCI Compliant container runtime to use. Examples: podman, docker"
+            },
+        ),
+
+        # Receptor options
+        (
+            ("--via-receptor",),
+            {
+                'default': None,
+                'help': "Run the job on a Receptor node rather than locally"
+            },
+        ),
+        (
+            ("--receptor-peer",),
+            {
+                'default': None,
+                'help': "peer connection to use to reach the Receptor network"
+            },
+        ),
+        (
+            ("--receptor-node-id",),
+            {
+                'default': None,
+                'help': "Receptor node-id to use for the local node"
+            },
+        )
     )
 
     parser.add_argument(
@@ -210,21 +376,83 @@ def main(sys_args=None):
     )
 
     # positional options
-
-    parser.add_argument(
-        "command",
-        choices=["run", "start", "stop", "is-alive", "adhoc", "playbook"],
-        metavar="COMMAND",
-        help="command directive for controlling ansible-runner execution "
-             "(one of 'run', 'start', 'stop', 'is-alive', 'adhoc', 'playbook')"
-        #help="command directive controlling ansible-runner execution"
+    run_subparser = subparser.add_parser(
+        'run',
+        help="Run ansible-runner in the foreground"
     )
-
-    parser.add_argument(
+    run_subparser.add_argument(
         'private_data_dir',
         help="base directory cotnaining the ansible-runner metadata "
              "(project, inventory, env, etc)"
     )
+    start_subparser = subparser.add_parser(
+        'start',
+        help="Start an ansible-runner process in the background"
+    )
+    start_subparser.add_argument(
+        'private_data_dir',
+        help="base directory cotnaining the ansible-runner metadata "
+             "(project, inventory, env, etc)"
+    )
+    stop_subparser = subparser.add_parser(
+        'stop',
+        help="Stop an ansible-runner process that's running in the background"
+    )
+    stop_subparser.add_argument(
+        'private_data_dir',
+        help="base directory cotnaining the ansible-runner metadata "
+             "(project, inventory, env, etc)"
+    )
+    isalive_subparser = subparser.add_parser(
+        'is-alive',
+        help="Check if a an ansible-runner process in the background is still running."
+    )
+    isalive_subparser.add_argument(
+        'private_data_dir',
+        help="base directory cotnaining the ansible-runner metadata "
+             "(project, inventory, env, etc)"
+    )
+    adhoc_subparser = subparser.add_parser(
+        'adhoc',
+        help="Check if a an ansible-runner process in the background is still running."
+    )
+    adhoc_subparser.add_argument(
+        'private_data_dir',
+        help="base directory cotnaining the ansible-runner metadata "
+             "(project, inventory, env, etc)"
+    )
+
+    run_runner_group = run_subparser.add_argument_group(
+        "Ansible Runner Options",
+        "configuration options for controlling the ansible-runner "
+        "runtime environment."
+    )
+    add_args_to_parser(run_runner_group, runner_arg_defs)
+    start_runner_group = start_subparser.add_argument_group(
+        "Ansible Runner Options",
+        "configuration options for controlling the ansible-runner "
+        "runtime environment."
+    )
+    add_args_to_parser(start_runner_group, runner_arg_defs)
+    stop_runner_group = stop_subparser.add_argument_group(
+        "Ansible Runner Options",
+        "configuration options for controlling the ansible-runner "
+        "runtime environment."
+    )
+    add_args_to_parser(stop_runner_group, runner_arg_defs)
+    isalive_runner_group = isalive_subparser.add_argument_group(
+        "Ansible Runner Options",
+        "configuration options for controlling the ansible-runner "
+        "runtime environment."
+    )
+    add_args_to_parser(isalive_runner_group, runner_arg_defs)
+
+    # FIXME - not sure if this will actually work
+    #parser.add_argument(
+    #    'private_data_dir',
+    #    help="base directory cotnaining the ansible-runner metadata "
+    #         "(project, inventory, env, etc)"
+    #)
 
     # mutually exclusive group
 
@@ -251,136 +479,6 @@ def main(sys_args=None):
              "(See Ansible Role Options below)"
     )
 
-    # ansible-runner options
-
-    runner_group = parser.add_argument_group(
-        "Ansible Runner Options",
-        "configuration options for controlling the ansible-runner "
-        "runtime environment."
-    )
-
-    runner_group.add_argument(
-        "--debug",
-        action="store_true",
-        help="enable ansible-runner debug output logging (default=False)"
-    )
-
-    runner_group.add_argument(
-        "--logfile",
-        help="log output messages to a file (default=None)"
-    )
-
-    runner_group.add_argument(
-        "-b", "--binary",
-        default=DEFAULT_RUNNER_BINARY,
-        help="specifies the full path pointing to the Ansible binaries "
-              "(default={})".format(DEFAULT_RUNNER_BINARY)
-    )
-
-    runner_group.add_argument(
-        "-i", "--ident",
-        default=DEFAULT_UUID,
-        help="an identifier that will be used when generating the artifacts "
-             "directory and can be used to uniquely identify a playbook run "
-             "(default={})".format(DEFAULT_UUID)
-    )
-
-    runner_group.add_argument(
-        "--rotate-artifacts",
-        default=0,
-        type=int,
-        help="automatically clean up old artifact directories after a given "
-             "number have been created (default=0, disabled)"
-    )
-
-    runner_group.add_argument(
-        "--artifact-dir",
-        help="optional path for the artifact root directory "
-             "(default=<private_data_dir>/artifacts)"
-    )
-
-    runner_group.add_argument(
-        "--project-dir",
-        help="optional path for the location of the playbook content directory "
-             "(default=<private_data_dir/project)"
-    )
-
-    runner_group.add_argument(
-        "--inventory",
-        help="optional path for the location of the inventory content directory "
-             "(default=<private_data_dir>/inventory)"
-    )
-
-    runner_group.add_argument(
-        "-j", "--json",
-        action="store_true",
-        help="output the JSON event structure to stdout instead of "
-             "Ansible output (default=False)"
-    )
-
-    runner_group.add_argument(
-        "--omit-event-data",
-        action="store_true",
-        help="Omits including extra event data in the callback payloads "
-             "or the Runner payload data files "
-             "(status and stdout still included)"
-    )
-
-    runner_group.add_argument(
-        "--only-failed-event-data",
-        action="store_true",
-        help="Only adds extra event data for failed tasks in the callback "
-             "payloads or the Runner payload data files "
-             "(status and stdout still included for other events)"
-    )
-
-    runner_group.add_argument(
-        "-q", "--quiet",
-        action="store_true",
-        help="disable all messages sent to stdout/stderr (default=False)"
-    )
-
-    runner_group.add_argument(
-        "-v",
-        action="count",
-        help="increase the verbosity with multiple v's (up to 5) of the "
-             "ansible-playbook output (default=None)"
-    )
-
-    # FIXME FIXME - this should probably be a reasonable default
-    runner_group.add_argument(
-        '--exec-env',
-        dest='container_image',
-        default='execenv',
-        help="Container image name containing an Ansible Execution Environment"
-    )
-
-    runner_group.add_argument(
-        '--container-runtime',
-        dest='container_runtime',
-        default='podman',
-        help="OCI Compliant container runtime to use. Examples: podman, docker"
-    )
-
-    # Receptor options
-
-    runner_group.add_argument(
-        "--via-receptor",
-        default=None,
-        help="Run the job on a Receptor node rather than locally"
-    )
-
-    runner_group.add_argument(
-        "--receptor-peer",
-        default=None,
-        help="peer connection to use to reach the Receptor network"
-    )
-
-    runner_group.add_argument(
-        "--receptor-node-id",
-        default=None,
-        help="Receptor node-id to use for the local node"
-    )
 
     # ansible options
 
@@ -556,6 +654,9 @@ def main(sys_args=None):
 
     args = parser.parse_args(sys_args)
 
+    import q; q.q(args)
+    import q; q.q(args.command)
+
     if args.command in ('start', 'run'):
         if args.hosts and not (args.module or args.role):
             parser.exit(status=1, message="The --hosts option can only be used with -m or -r\n")
@@ -610,6 +711,10 @@ def main(sys_args=None):
 
         if args.command in ('adhoc', 'playbook'):
             containerized = True
+            args.command = 'run'
+            if args.command == 'adhoc':
+                pass
+                #FIXME
         else:
             containerized = False
 
