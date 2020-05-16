@@ -141,6 +141,9 @@ def run(**kwargs):
     :param via_receptor: If set, specifies a Receptor node-id on which the job will be run remotely
     :param receptor_peer: Specifies the Receptor listener, in URL format, to use to connect to the Receptor network
     :param receptor_node_id: Specifies the node-id to assign to the local Receptor ephemeral node
+    :param containerized: Defines if Runner should execute inside a containerized Execution Environment
+    :param container_image: Defines which OCI Container Image should be used to launch the Execution Environment
+    :param container_runtime: Defines which OCI Compliant Container Runtime should be used to run the Execution Environment
     :type private_data_dir: str
     :type ident: str
     :type json_mode: bool
@@ -183,6 +186,9 @@ def run(**kwargs):
     :type via_receptor: str
     :type receptor_peer: str
     :type receptor_node_id: str
+    :type containerized: bool
+    :type container_image: str
+    :type container_runtime: str
 
     :returns: A :py:class:`ansible_runner.runner.Runner` object, or a simple object containing `rc` if run remotely
     '''

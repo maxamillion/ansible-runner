@@ -426,11 +426,11 @@ logger = logging.getLogger('ansible-runner')
 
 @contextmanager
 def role_manager(args):
-    if args.role:
-        role = {'name': args.role}
-        if args.role_vars:
+    if vargs.get('role'):
+        role = {'name': vargs.get('role')}
+        if vargs.get('role_vars'):
             role_vars = {}
-            for item in args.role_vars.split():
+            for item in vargs['role_vars'].split():
                 key, value = item.split('=')
                 try:
                     role_vars[key] = ast.literal_eval(value)
@@ -438,37 +438,37 @@ def role_manager(args):
                     role_vars[key] = value
             role['vars'] = role_vars
 
-        kwargs = Bunch(**args.__dict__)
-        kwargs.update(private_data_dir=args.private_data_dir,
-                      json_mode=args.json,
+        kwargs = Bunch(**vargs)
+        kwargs.update(private_data_dir=vargs.get('private_data_dir'),
+                      json_mode=vargs.get('json'),
                       ignore_logging=False,
-                      project_dir=args.project_dir,
-                      rotate_artifacts=args.rotate_artifacts)
+                      project_dir=vargs.get('project_dir'),
+                      rotate_artifacts=vargs.get('rotate_artifacts'))
 
-        if args.artifact_dir:
-            kwargs.artifact_dir = args.artifact_dir
+        if vargs.get('artifact_dir'):
+            kwargs.artifact_dir = vargs.get('artifact_dir')
 
-        if args.project_dir:
-            project_path = kwargs.project_dir = args.project_dir
+        if vargs.get('project_dir'):
+            project_path = kwargs.project_dir = vargs.get('project_dir')
         else:
-            project_path = os.path.join(args.private_data_dir, 'project')
+            project_path = os.path.join(vargs.get('private_data_dir'), 'project')
 
         project_exists = os.path.exists(project_path)
 
-        env_path = os.path.join(args.private_data_dir, 'env')
+        env_path = os.path.join(vargs.get('private_data_dir'), 'env')
         env_exists = os.path.exists(env_path)
 
-        envvars_path = os.path.join(args.private_data_dir, 'env/envvars')
+        envvars_path = os.path.join(vargs.get('private_data_dir'), 'env/envvars')
         envvars_exists = os.path.exists(envvars_path)
 
-        if args.cmdline:
-            kwargs.cmdline = args.cmdline
+        if vargs.get('cmdline'):
+            kwargs.cmdline = vargs.get('cmdline')
 
         playbook = None
         tmpvars = None
 
-        play = [{'hosts': args.hosts if args.hosts is not None else "all",
-                 'gather_facts': not args.role_skip_facts,
+        play = [{'hosts': vargs.get('hosts') if vargs.get('hosts') is not None else "all",
+                 'gather_facts': not vargs.get('role_skip_facts'),
                  'roles': [role]}]
 
         filename = str(uuid4().hex)
@@ -477,14 +477,14 @@ def role_manager(args):
         kwargs.playbook = playbook
         output.debug('using playbook file %s' % playbook)
 
-        if args.inventory:
-            inventory_file = os.path.join(args.private_data_dir, 'inventory', args.inventory)
+        if vargs.get('inventory'):
+            inventory_file = os.path.join(vargs.get('private_data_dir'), 'inventory', vargs.get('inventory'))
             if not os.path.exists(inventory_file):
                 raise AnsibleRunnerException('location specified by --inventory does not exist')
             kwargs.inventory = inventory_file
             output.debug('using inventory file %s' % inventory_file)
 
-        roles_path = args.roles_path or os.path.join(args.private_data_dir, 'roles')
+        roles_path = vargs.get('roles_path') or os.path.join(vargs.get('private_data_dir'), 'roles')
         roles_path = os.path.abspath(roles_path)
         output.debug('setting ANSIBLE_ROLES_PATH to %s' % roles_path)
 
@@ -503,7 +503,7 @@ def role_manager(args):
 
     yield kwargs
 
-    if args.role:
+    if vargs.get('role'):
         if not project_exists and os.path.exists(project_path):
             logger.debug('removing dynamically generated project folder')
             shutil.rmtree(project_path)
@@ -612,18 +612,12 @@ def main(sys_args=None):
         help="Check if a an ansible-runner process in the background is still running."
     )
     add_args_to_parser(isalive_subparser, DEFAULT_CLI_ARGS['positional_args'])
-    adhoc_subparser = subparser.add_parser(
-        'adhoc',
-        help="Check if a an ansible-runner process in the background is still running."
-    )
-    add_args_to_parser(adhoc_subparser, DEFAULT_CLI_ARGS['positional_args'])
 
     # misc args
     add_args_to_parser(run_subparser, DEFAULT_CLI_ARGS['misc_args'])
     add_args_to_parser(start_subparser, DEFAULT_CLI_ARGS['misc_args'])
     add_args_to_parser(stop_subparser, DEFAULT_CLI_ARGS['misc_args'])
     add_args_to_parser(isalive_subparser, DEFAULT_CLI_ARGS['misc_args'])
-    add_args_to_parser(adhoc_subparser, DEFAULT_CLI_ARGS['misc_args'])
 
     # runner group
     ansible_runner_group_options = (
@@ -635,24 +629,20 @@ def main(sys_args=None):
     start_runner_group = start_subparser.add_argument_group(*ansible_runner_group_options)
     stop_runner_group = stop_subparser.add_argument_group(*ansible_runner_group_options)
     isalive_runner_group = isalive_subparser.add_argument_group(*ansible_runner_group_options)
-    adhoc_runner_group = adhoc_subparser.add_argument_group(*ansible_runner_group_options)
     add_args_to_parser(run_runner_group, DEFAULT_CLI_ARGS['runner_group'])
     add_args_to_parser(start_runner_group, DEFAULT_CLI_ARGS['runner_group'])
     add_args_to_parser(stop_runner_group, DEFAULT_CLI_ARGS['runner_group'])
     add_args_to_parser(isalive_runner_group, DEFAULT_CLI_ARGS['runner_group'])
-    add_args_to_parser(adhoc_runner_group, DEFAULT_CLI_ARGS['runner_group'])
 
     # mutually exclusive group
     run_mutually_exclusive_group = run_subparser.add_mutually_exclusive_group()
     start_mutually_exclusive_group = start_subparser.add_mutually_exclusive_group()
     stop_mutually_exclusive_group = stop_subparser.add_mutually_exclusive_group()
     isalive_mutually_exclusive_group = isalive_subparser.add_mutually_exclusive_group()
-    adhoc_mutually_exclusive_group = adhoc_subparser.add_mutually_exclusive_group()
     add_args_to_parser(run_mutually_exclusive_group, DEFAULT_CLI_ARGS['mutually_exclusive_group'])
     add_args_to_parser(start_mutually_exclusive_group, DEFAULT_CLI_ARGS['mutually_exclusive_group'])
     add_args_to_parser(stop_mutually_exclusive_group, DEFAULT_CLI_ARGS['mutually_exclusive_group'])
     add_args_to_parser(isalive_mutually_exclusive_group, DEFAULT_CLI_ARGS['mutually_exclusive_group'])
-    add_args_to_parser(adhoc_mutually_exclusive_group, DEFAULT_CLI_ARGS['mutually_exclusive_group'])
 
     # ansible options
     ansible_options = (
@@ -663,12 +653,10 @@ def main(sys_args=None):
     start_ansible_group = start_subparser.add_argument_group(*ansible_options)
     stop_ansible_group = stop_subparser.add_argument_group(*ansible_options)
     isalive_ansible_group = isalive_subparser.add_argument_group(*ansible_options)
-    adhoc_ansible_group = adhoc_subparser.add_argument_group(*ansible_options)
     add_args_to_parser(run_ansible_group, DEFAULT_CLI_ARGS['ansible_group'])
     add_args_to_parser(start_ansible_group, DEFAULT_CLI_ARGS['ansible_group'])
     add_args_to_parser(stop_ansible_group, DEFAULT_CLI_ARGS['ansible_group'])
     add_args_to_parser(isalive_ansible_group, DEFAULT_CLI_ARGS['ansible_group'])
-    add_args_to_parser(adhoc_ansible_group, DEFAULT_CLI_ARGS['ansible_group'])
 
 
     # roles group
@@ -680,12 +668,10 @@ def main(sys_args=None):
     start_roles_group = start_subparser.add_argument_group(*roles_group_options)
     stop_roles_group = stop_subparser.add_argument_group(*roles_group_options)
     isalive_roles_group = isalive_subparser.add_argument_group(*roles_group_options)
-    adhoc_roles_group = adhoc_subparser.add_argument_group(*roles_group_options)
     add_args_to_parser(run_roles_group, DEFAULT_CLI_ARGS['roles_group'])
     add_args_to_parser(start_roles_group, DEFAULT_CLI_ARGS['roles_group'])
     add_args_to_parser(stop_roles_group, DEFAULT_CLI_ARGS['roles_group'])
     add_args_to_parser(isalive_roles_group, DEFAULT_CLI_ARGS['roles_group'])
-    add_args_to_parser(adhoc_roles_group, DEFAULT_CLI_ARGS['roles_group'])
 
     # modules groups
 
@@ -697,12 +683,10 @@ def main(sys_args=None):
     start_modules_group = start_subparser.add_argument_group(*modules_group_options)
     stop_modules_group = stop_subparser.add_argument_group(*modules_group_options)
     isalive_modules_group = isalive_subparser.add_argument_group(*modules_group_options)
-    adhoc_modules_group = adhoc_subparser.add_argument_group(*modules_group_options)
     add_args_to_parser(run_modules_group, DEFAULT_CLI_ARGS['modules_group'])
     add_args_to_parser(start_modules_group, DEFAULT_CLI_ARGS['modules_group'])
     add_args_to_parser(stop_modules_group, DEFAULT_CLI_ARGS['modules_group'])
     add_args_to_parser(isalive_modules_group, DEFAULT_CLI_ARGS['modules_group'])
-    add_args_to_parser(adhoc_modules_group, DEFAULT_CLI_ARGS['modules_group'])
 
     # playbook options
     playbook_group_options = (
@@ -713,13 +697,32 @@ def main(sys_args=None):
     start_playbook_group = start_subparser.add_argument_group(*playbook_group_options)
     stop_playbook_group = stop_subparser.add_argument_group(*playbook_group_options)
     isalive_playbook_group = isalive_subparser.add_argument_group(*playbook_group_options)
-    adhoc_playbook_group = adhoc_subparser.add_argument_group(*playbook_group_options)
     add_args_to_parser(run_playbook_group, DEFAULT_CLI_ARGS['playbook_group'])
     add_args_to_parser(start_playbook_group, DEFAULT_CLI_ARGS['playbook_group'])
     add_args_to_parser(stop_playbook_group, DEFAULT_CLI_ARGS['playbook_group'])
     add_args_to_parser(isalive_playbook_group, DEFAULT_CLI_ARGS['playbook_group'])
-    add_args_to_parser(adhoc_playbook_group, DEFAULT_CLI_ARGS['playbook_group'])
 
+
+    # adhoc command exec
+    adhoc_subparser = subparser.add_parser(
+        'adhoc',
+        help="Check if a an ansible-runner process in the background is still running."
+    )
+    adhoc_subparser.add_argument(
+        "hosts",
+        help="host pattern to execute against"
+    )
+    adhoc_subparser.add_argument(
+        "-m", "--module",
+        help="invoke an Ansible module directly without a playbook "
+             "(See Ansible Module Options below)"
+    )
+    adhoc_subparser.add_argument(
+        "cmdline",
+        nargs=argparse.REMAINDER,
+        help="command line options to pass to ansible-playbook at "
+             "execution time"
+    )
 
     if len(sys.argv) == 1:
         parser.print_usage()
@@ -727,116 +730,111 @@ def main(sys_args=None):
         parser.exit(status=0)
 
     args = parser.parse_args(sys_args)
+    vargs = vars(args)
 
-    import q; q.q(args)
-    import q; q.q(args.command)
+    if vargs.get('command') in ('adhoc', 'playbook'):
+        containerized = True
+        if vargs['command'] == 'adhoc':
+            vargs['private_data_dir'] = '.'
+    else:
+        containerized = False
 
-    if args.command in ('start', 'run'):
-        if args.hosts and not (args.module or args.role):
+    if vargs.get('command') in ('start', 'run'):
+        if vargs.get('hosts') and not (vargs.get('module') or vargs.get('role')):
             parser.exit(status=1, message="The --hosts option can only be used with -m or -r\n")
-        if not (args.module or args.role) and not args.playbook:
+        if not (vargs.get('module') or vargs.get('role')) and not vargs.get('playbook'):
             parser.exit(status=1, message="The -p option must be specified when not using -m or -r\n")
 
-    if args.via_receptor and not receptor_import:
+    if vargs.get('via_receptor') and not receptor_import:
         parser.exit(status=1, message="The --via-receptor option requires Receptor to be installed.\n")
 
-    if args.via_receptor and args.command != 'run':
+    if vargs.get('via_receptor') and vargs.get('command') != 'run':
         parser.exit(status=1, message="Only the 'run' command is supported via Receptor.\n")
 
     output.configure()
 
     # enable or disable debug mode
-    output.set_debug('enable' if args.debug else 'disable')
+    output.set_debug('enable' if vargs.get('debug') else 'disable')
 
     # set the output logfile
-    if args.logfile:
-        output.set_logfile(args.logfile)
+    if ('logfile' in args) and vargs.get('logfile'):
+        output.set_logfile(vargs.get('logfile'))
 
     output.debug('starting debug logging')
 
     # get the absolute path for start since it is a daemon
-    args.private_data_dir = os.path.abspath(args.private_data_dir)
+    vargs['private_data_dir'] = os.path.abspath(vargs.get('private_data_dir'))
 
-    pidfile = os.path.join(args.private_data_dir, 'pid')
+    pidfile = os.path.join(vargs.get('private_data_dir'), 'pid')
 
     try:
-        os.makedirs(args.private_data_dir, mode=0o700)
+        os.makedirs(vargs.get('private_data_dir'), mode=0o700)
     except OSError as exc:
-        if exc.errno == errno.EEXIST and os.path.isdir(args.private_data_dir):
+        if exc.errno == errno.EEXIST and os.path.isdir(vargs.get('private_data_dir')):
             pass
         else:
             raise
 
     stderr_path = None
     context = None
-    if args.command != 'run':
-        stderr_path = os.path.join(args.private_data_dir, 'daemon.log')
+    if vargs.get('command') != 'run':
+        stderr_path = os.path.join(vargs.get('private_data_dir'), 'daemon.log')
         if not os.path.exists(stderr_path):
             os.close(os.open(stderr_path, os.O_CREAT, stat.S_IRUSR | stat.S_IWUSR))
 
-    if args.command in ('start', 'run', 'adhoc', 'playbook'):
+    if vargs.get('command') in ('start', 'run', 'adhoc', 'playbook'):
 
-        if args.command == 'start':
+        if vargs.get('command') == 'start':
             import daemon
             from daemon.pidfile import TimeoutPIDLockFile
             context = daemon.DaemonContext(pidfile=TimeoutPIDLockFile(pidfile))
         else:
             context = threading.Lock()
 
-        if args.command in ('adhoc', 'playbook'):
-            containerized = True
-            args.command = 'run'
-            if args.command == 'adhoc':
-                pass
-                #FIXME
-        else:
-            containerized = False
-
-
         with context:
             with role_manager(args) as args:
-                run_options = dict(private_data_dir=args.private_data_dir,
-                                   ident=args.ident,
-                                   binary=args.binary,
-                                   playbook=args.playbook,
-                                   module=args.module,
-                                   module_args=args.module_args,
-                                   host_pattern=args.hosts,
-                                   verbosity=args.v,
-                                   quiet=args.quiet,
-                                   rotate_artifacts=args.rotate_artifacts,
+                run_options = dict(private_data_dir=vargs.get('private_data_dir'),
+                                   ident=vargs.get('ident'),
+                                   binary=vargs.get('binary'),
+                                   playbook=vargs.get('playbook'),
+                                   module=vargs.get('module'),
+                                   module_args=vargs.get('module_args'),
+                                   host_pattern=vargs.get('hosts'),
+                                   verbosity=vargs.get('v'),
+                                   quiet=vargs.get('quiet'),
+                                   rotate_artifacts=vargs.get('rotate_artifacts'),
                                    ignore_logging=False,
-                                   json_mode=args.json,
-                                   omit_event_data=args.omit_event_data,
-                                   only_failed_event_data=args.only_failed_event_data,
-                                   inventory=args.inventory,
-                                   forks=args.forks,
-                                   project_dir=args.project_dir,
-                                   artifact_dir=args.artifact_dir,
-                                   roles_path=[args.roles_path] if args.roles_path else None,
-                                   process_isolation=args.process_isolation,
-                                   process_isolation_executable=args.process_isolation_executable,
-                                   process_isolation_path=args.process_isolation_path,
-                                   process_isolation_hide_paths=args.process_isolation_hide_paths,
-                                   process_isolation_show_paths=args.process_isolation_show_paths,
-                                   process_isolation_ro_paths=args.process_isolation_ro_paths,
-                                   directory_isolation_base_path=args.directory_isolation_base_path,
-                                   resource_profiling=args.resource_profiling,
-                                   resource_profiling_base_cgroup=args.resource_profiling_base_cgroup,
-                                   resource_profiling_cpu_poll_interval=args.resource_profiling_cpu_poll_interval,
-                                   resource_profiling_memory_poll_interval=args.resource_profiling_memory_poll_interval,
-                                   resource_profiling_pid_poll_interval=args.resource_profiling_pid_poll_interval,
-                                   resource_profiling_results_dir=args.resource_profiling_results_dir,
-                                   limit=args.limit,
-                                   via_receptor=args.via_receptor,
-                                   receptor_peer=args.receptor_peer,
-                                   receptor_node_id=args.receptor_node_id,
+                                   json_mode=vargs.get('json'),
+                                   omit_event_data=vargs.get('omit_event_data'),
+                                   only_failed_event_data=vargs.get('only_failed_event_data'),
+                                   inventory=vargs.get('inventory'),
+                                   forks=vargs.get('forks'),
+                                   project_dir=vargs.get('project_dir'),
+                                   artifact_dir=vargs.get('artifact_dir'),
+                                   roles_path=[vargs.get('roles_path')] if vargs.get('roles_path') else None,
+                                   process_isolation=vargs.get('process_isolation'),
+                                   process_isolation_executable=vargs.get('process_isolation_executable'),
+                                   process_isolation_path=vargs.get('process_isolation_path'),
+                                   process_isolation_hide_paths=vargs.get('process_isolation_hide_paths'),
+                                   process_isolation_show_paths=vargs.get('process_isolation_show_paths'),
+                                   process_isolation_ro_paths=vargs.get('process_isolation_ro_paths'),
+                                   directory_isolation_base_path=vargs.get('directory_isolation_base_path'),
+                                   resource_profiling=vargs.get('resource_profiling'),
+                                   resource_profiling_base_cgroup=vargs.get('resource_profiling_base_cgroup'),
+                                   resource_profiling_cpu_poll_interval=vargs.get('resource_profiling_cpu_poll_interval'),
+                                   resource_profiling_memory_poll_interval=vargs.get('resource_profiling_memory_poll_interval'),
+                                   resource_profiling_pid_poll_interval=vargs.get('resource_profiling_pid_poll_interval'),
+                                   resource_profiling_results_dir=vargs.get('resource_profiling_results_dir'),
+                                   limit=vargs.get('limit'),
+                                   via_receptor=vargs.get('via_receptor'),
+                                   receptor_peer=vargs.get('receptor_peer'),
+                                   receptor_node_id=vargs.get('receptor_node_id'),
                                    containerized=containerized,
-                                   container_runtime=args.container_runtime,
-                                   container_image=args.container_image
+                                   container_runtime=vargs.get('container_runtime'),
+                                   container_image=vargs.get('container_image')
                                    )
-                if args.cmdline:
-                    run_options['cmdline'] = args.cmdline
+                if vargs.get('cmdline'):
+                    run_options['cmdline'] = vargs.get('cmdline')
 
                 try:
                     res = run(**run_options)
@@ -855,11 +853,11 @@ def main(sys_args=None):
     except IOError:
         return(1)
 
-    if args.command == 'stop':
+    if vargs.get('command') == 'stop':
         Runner.handle_termination(pid, pidfile=pidfile)
         return (0)
 
-    elif args.command == 'is-alive':
+    elif vargs.get('command') == 'is-alive':
         try:
             os.kill(pid, signal.SIG_DFL)
             return(0)
