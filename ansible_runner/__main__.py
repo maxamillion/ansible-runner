@@ -425,7 +425,7 @@ logger = logging.getLogger('ansible-runner')
 
 
 @contextmanager
-def role_manager(args):
+def role_manager(vargs):
     if vargs.get('role'):
         role = {'name': vargs.get('role')}
         if vargs.get('role_vars'):
@@ -499,7 +499,7 @@ def role_manager(args):
         envvars['ANSIBLE_ROLES_PATH'] = roles_path
         kwargs.envvars = envvars
     else:
-        kwargs = args
+        kwargs = vargs
 
     yield kwargs
 
@@ -777,7 +777,7 @@ def main(sys_args=None):
 
     stderr_path = None
     context = None
-    if vargs.get('command') != 'run':
+    if vargs.get('command') not in ('run', 'adhoc', 'playbook'):
         stderr_path = os.path.join(vargs.get('private_data_dir'), 'daemon.log')
         if not os.path.exists(stderr_path):
             os.close(os.open(stderr_path, os.O_CREAT, stat.S_IRUSR | stat.S_IWUSR))
@@ -792,7 +792,7 @@ def main(sys_args=None):
             context = threading.Lock()
 
         with context:
-            with role_manager(args) as args:
+            with role_manager(vargs) as vargs:
                 run_options = dict(private_data_dir=vargs.get('private_data_dir'),
                                    ident=vargs.get('ident'),
                                    binary=vargs.get('binary'),
