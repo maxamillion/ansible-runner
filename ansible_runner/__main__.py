@@ -564,9 +564,6 @@ def add_args_to_parser(parser, args):
     :returns: None
     """
     for arg in args:
-        import q; q.q(arg[0])
-        import q; q.q(arg[1])
-
         parser.add_argument(*arg[0], **arg[1])
 
 
@@ -630,12 +627,9 @@ def main(sys_args=None):
 
     # runner group
     ansible_runner_group_options = (
-        (
-            "Ansible Runner Options",
-            "configuration options for controlling the ansible-runner "
-            "runtime environment.",
-        ),
-        {},
+        "Ansible Runner Options",
+        "configuration options for controlling the ansible-runner "
+        "runtime environment.",
     )
     run_runner_group = run_subparser.add_argument_group(*ansible_runner_group_options)
     start_runner_group = start_subparser.add_argument_group(*ansible_runner_group_options)
@@ -662,30 +656,25 @@ def main(sys_args=None):
 
     # ansible options
     ansible_options = (
-        (
-            "Ansible Options",
-            "control the ansible[-playbook] execution environment",
-        ),
-        {},
+        "Ansible Options",
+        "control the ansible[-playbook] execution environment",
     )
     run_ansible_group = run_subparser.add_argument_group(*ansible_options)
     start_ansible_group = start_subparser.add_argument_group(*ansible_options)
     stop_ansible_group = stop_subparser.add_argument_group(*ansible_options)
     isalive_ansible_group = isalive_subparser.add_argument_group(*ansible_options)
-    adhoc_ansible_group = isalive_subparser.add_argument_group(*ansible_options)
+    adhoc_ansible_group = adhoc_subparser.add_argument_group(*ansible_options)
     add_args_to_parser(run_ansible_group, DEFAULT_CLI_ARGS['ansible_group'])
     add_args_to_parser(start_ansible_group, DEFAULT_CLI_ARGS['ansible_group'])
     add_args_to_parser(stop_ansible_group, DEFAULT_CLI_ARGS['ansible_group'])
+    add_args_to_parser(isalive_ansible_group, DEFAULT_CLI_ARGS['ansible_group'])
     add_args_to_parser(adhoc_ansible_group, DEFAULT_CLI_ARGS['ansible_group'])
 
 
     # roles group
     roles_group_options = (
-        (
-            "Ansible Role Options",
-            "configuration options for directly executing Ansible roles",
-        ),
-        {},
+        "Ansible Role Options",
+        "configuration options for directly executing Ansible roles",
     )
     run_roles_group = run_subparser.add_argument_group(*roles_group_options)
     start_roles_group = start_subparser.add_argument_group(*roles_group_options)
@@ -701,11 +690,8 @@ def main(sys_args=None):
     # modules groups
 
     modules_group_options = (
-        (
             "Ansible Module Options",
             "configuration options for directly executing Ansible modules",
-        ),
-        {}
     )
     run_modules_group = run_subparser.add_argument_group(*modules_group_options)
     start_modules_group = start_subparser.add_argument_group(*modules_group_options)
@@ -720,11 +706,8 @@ def main(sys_args=None):
 
     # playbook options
     playbook_group_options = (
-        (
-            "Ansible Playbook Options",
-            "configuation options for executing Ansible playbooks",
-        ),
-        {},
+        "Ansible Playbook Options",
+        "configuation options for executing Ansible playbooks",
     )
     run_playbook_group = run_subparser.add_argument_group(*playbook_group_options)
     start_playbook_group = start_subparser.add_argument_group(*playbook_group_options)
