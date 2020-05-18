@@ -46,7 +46,8 @@ def init_runner(**kwargs):
 
     See parameters given to :py:func:`ansible_runner.interface.run`
     '''
-    dump_artifacts(kwargs)
+    if not kwargs.get('adhoc_execenv'):
+        dump_artifacts(kwargs)
 
     debug = kwargs.pop('debug', None)
     logfile = kwargs.pop('logfile', None)
@@ -144,6 +145,7 @@ def run(**kwargs):
     :param containerized: Defines if Runner should execute inside a containerized Execution Environment
     :param container_image: Defines which OCI Container Image should be used to launch the Execution Environment
     :param container_runtime: Defines which OCI Compliant Container Runtime should be used to run the Execution Environment
+    :param adhoc_execenv: Tells Ansible Runner to emulate the CLI of Ansible by prepping an Execution Environment and then passing the user provided cmdline
     :type private_data_dir: str
     :type ident: str
     :type json_mode: bool
@@ -189,6 +191,7 @@ def run(**kwargs):
     :type containerized: bool
     :type container_image: str
     :type container_runtime: str
+    :type adhoc_execenv: bool
 
     :returns: A :py:class:`ansible_runner.runner.Runner` object, or a simple object containing `rc` if run remotely
     '''

@@ -52,6 +52,7 @@ class ExecutionMode():
     ANSIBLE = 1
     ANSIBLE_PLAYBOOK = 2
     RAW = 3
+    ADHOC_EXECENV = 4
 
 
 class RunnerConfig(object):
@@ -84,7 +85,8 @@ class RunnerConfig(object):
                  resource_profiling_results_dir=None,
                  tags=None, skip_tags=None, fact_cache_type='jsonfile', fact_cache=None, ssh_key=None,
                  project_dir=None, directory_isolation_base_path=None, envvars=None, forks=None, cmdline=None, omit_event_data=False,
-                 only_failed_event_data=False, containerized=False, container_runtime="podman", container_image="execenv"):
+                 only_failed_event_data=False, containerized=False, container_runtime="podman", container_image="shanemcd/ansible-runner",
+                 adhoc_execenv=False):
         self.private_data_dir = os.path.abspath(private_data_dir)
         self.ident = str(ident)
         self.json_mode = json_mode
@@ -94,6 +96,7 @@ class RunnerConfig(object):
         self.limit = limit
         self.module = module
         self.module_args = module_args
+        self.adhoc_execenv = adhoc_execenv
         self.host_pattern = host_pattern
         self.binary = binary
         self.rotate_artifacts = rotate_artifacts
@@ -140,6 +143,7 @@ class RunnerConfig(object):
         self.envvars = envvars
         self.forks = forks
         self.cmdline_args = cmdline
+
         self.omit_event_data = omit_event_data
         self.only_failed_event_data = only_failed_event_data
 
@@ -182,6 +186,8 @@ class RunnerConfig(object):
             raise ConfigurationError("Runner playbook required when running ansible-playbook")
         elif self.execution_mode == ExecutionMode.ANSIBLE and self.module is None:
             raise ConfigurationError("Runner module required when running ansible")
+        elif self.execution_mode == ExecutionMode.ADHOC_EXECENV and self.cmdline_args is None:
+            raise ConfigurationError("Runner requires arguments to pass to ansible, try '-h' for ansible help output")
         elif self.execution_mode == ExecutionMode.NONE:
             raise ConfigurationError("No executable for runner to run")
 
@@ -326,8 +332,9 @@ class RunnerConfig(object):
         self.suppress_ansible_output = self.settings.get('suppress_ansible_output', self.quiet)
         self.directory_isolation_cleanup = bool(self.settings.get('directory_isolation_cleanup', True))
 
-        self.containerized = self.settings.get('containerized', False)
-        self.container_runtime = self.settings.get('container_runtime', 'podman')
+        if not self.adhoc_execenv:
+            self.containerized = self.settings.get('containerized', False)
+            self.container_runtime = self.settings.get('container_runtime', 'podman')
 
         if 'AD_HOC_COMMAND_ID' in self.env or not os.path.exists(self.project_dir):
             self.cwd = self.private_data_dir
@@ -349,14 +356,21 @@ class RunnerConfig(object):
         Determines if the literal ``ansible`` or ``ansible-playbook`` commands are given
         and if not calls :py:meth:`ansible_runner.runner_config.RunnerConfig.generate_ansible_command`
         """
-        try:
-            cmdline_args = self.loader.load_file('args', string_types, encoding=None)
-            if six.PY2 and isinstance(cmdline_args, text_type):
-                cmdline_args = cmdline_args.encode('utf-8')
-            self.command = shlex.split(cmdline_args)
-            self.execution_mode = ExecutionMode.RAW
-        except ConfigurationError:
-            self.command = self.generate_ansible_command()
+        if not self.adhoc_execenv:
+            try:
+                cmdline_args = self.loader.load_file('args', string_types, encoding=None)
+
+                if six.PY2 and isinstance(cmdline_args, text_type):
+                    cmdline_args = cmdline_args.encode('utf-8')
+                self.command = shlex.split(cmdline_args)
+                self.execution_mode = ExecutionMode.RAW
+            except ConfigurationError:
+                self.command = self.generate_ansible_command()
+        else:
+            if self.adhoc_execenv:
+                self.command = ['ansible'] + self.cmdline_args 
+                self.execution_mode = ExecutionMode.ADHOC_EXECENV
+
 
     def generate_ansible_command(self):
         """
@@ -364,7 +378,10 @@ class RunnerConfig(object):
         will generate the ``ansible`` or ``ansible-playbook`` command that will be used by the
         :py:class:`ansible_runner.runner.Runner` object to start the process
         """
-        if self.binary is not None:
+        if self.adhoc_execenv:
+            base_command = 'ansible'
+            self.execution_mode = ExecutionMode.ADHOC_EXECENV
+        elif self.binary is not None:
             base_command = self.binary
             self.execution_mode = ExecutionMode.RAW
         elif self.module is not None:
@@ -549,7 +566,7 @@ class RunnerConfig(object):
 
         artifact_dir = os.path.join("/runner/artifacts", "{}".format(self.ident))
         new_args.extend(["-e", "AWX_ISOLATED_DATA_DIR={}".format(artifact_dir)])
-        new_args.extend(['shanemcd/ansible-runner'])
+        new_args.extend([self.container_image])
         new_args.extend(args)
 
         return new_args

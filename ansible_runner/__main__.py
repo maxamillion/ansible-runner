@@ -613,11 +613,36 @@ def main(sys_args=None):
     )
     add_args_to_parser(isalive_subparser, DEFAULT_CLI_ARGS['positional_args'])
 
+
+    # adhoc command exec
+    adhoc_subparser = subparser.add_parser(
+        'adhoc',
+        help="Check if a an ansible-runner process in the background is still running."
+    )
+#   adhoc_subparser.add_argument(
+#       "hosts",
+#       help="host pattern to execute against"
+#   )
+#   adhoc_subparser.add_argument(
+#       "-m", "--module",
+#       dest=module,
+#       default=DEFAULT_RUNNER_MODULE,
+#       help="invoke an Ansible module directly without a playbook "
+#            "(See Ansible Module Options below)"
+#   )
+    adhoc_subparser.add_argument(
+        "cmdline",
+        nargs=argparse.REMAINDER,
+        help="command line options to pass to ansible-playbook at "
+             "execution time"
+    )
+
     # misc args
     add_args_to_parser(run_subparser, DEFAULT_CLI_ARGS['misc_args'])
     add_args_to_parser(start_subparser, DEFAULT_CLI_ARGS['misc_args'])
     add_args_to_parser(stop_subparser, DEFAULT_CLI_ARGS['misc_args'])
     add_args_to_parser(isalive_subparser, DEFAULT_CLI_ARGS['misc_args'])
+    add_args_to_parser(adhoc_subparser, DEFAULT_CLI_ARGS['misc_args'])
 
     # runner group
     ansible_runner_group_options = (
@@ -629,10 +654,12 @@ def main(sys_args=None):
     start_runner_group = start_subparser.add_argument_group(*ansible_runner_group_options)
     stop_runner_group = stop_subparser.add_argument_group(*ansible_runner_group_options)
     isalive_runner_group = isalive_subparser.add_argument_group(*ansible_runner_group_options)
+    adhoc_runner_group = adhoc_subparser.add_argument_group(*ansible_runner_group_options)
     add_args_to_parser(run_runner_group, DEFAULT_CLI_ARGS['runner_group'])
     add_args_to_parser(start_runner_group, DEFAULT_CLI_ARGS['runner_group'])
     add_args_to_parser(stop_runner_group, DEFAULT_CLI_ARGS['runner_group'])
     add_args_to_parser(isalive_runner_group, DEFAULT_CLI_ARGS['runner_group'])
+    add_args_to_parser(adhoc_runner_group, DEFAULT_CLI_ARGS['runner_group'])
 
     # mutually exclusive group
     run_mutually_exclusive_group = run_subparser.add_mutually_exclusive_group()
@@ -683,10 +710,12 @@ def main(sys_args=None):
     start_modules_group = start_subparser.add_argument_group(*modules_group_options)
     stop_modules_group = stop_subparser.add_argument_group(*modules_group_options)
     isalive_modules_group = isalive_subparser.add_argument_group(*modules_group_options)
+    adhoc_modules_group = adhoc_subparser.add_argument_group(*modules_group_options)
     add_args_to_parser(run_modules_group, DEFAULT_CLI_ARGS['modules_group'])
     add_args_to_parser(start_modules_group, DEFAULT_CLI_ARGS['modules_group'])
     add_args_to_parser(stop_modules_group, DEFAULT_CLI_ARGS['modules_group'])
     add_args_to_parser(isalive_modules_group, DEFAULT_CLI_ARGS['modules_group'])
+    add_args_to_parser(adhoc_modules_group, DEFAULT_CLI_ARGS['modules_group'])
 
     # playbook options
     playbook_group_options = (
@@ -702,28 +731,6 @@ def main(sys_args=None):
     add_args_to_parser(stop_playbook_group, DEFAULT_CLI_ARGS['playbook_group'])
     add_args_to_parser(isalive_playbook_group, DEFAULT_CLI_ARGS['playbook_group'])
 
-
-    # adhoc command exec
-    adhoc_subparser = subparser.add_parser(
-        'adhoc',
-        help="Check if a an ansible-runner process in the background is still running."
-    )
-    adhoc_subparser.add_argument(
-        "hosts",
-        help="host pattern to execute against"
-    )
-    adhoc_subparser.add_argument(
-        "-m", "--module",
-        help="invoke an Ansible module directly without a playbook "
-             "(See Ansible Module Options below)"
-    )
-    adhoc_subparser.add_argument(
-        "cmdline",
-        nargs=argparse.REMAINDER,
-        help="command line options to pass to ansible-playbook at "
-             "execution time"
-    )
-
     if len(sys.argv) == 1:
         parser.print_usage()
         print_common_usage()
@@ -732,12 +739,17 @@ def main(sys_args=None):
     args = parser.parse_args(sys_args)
     vargs = vars(args)
 
+    # FIXME - Probably a more elegant way to handle this.
+    # set some state about CLI Exec Env 
+    adhoc_execenv = False
+    containerized = False
+
     if vargs.get('command') in ('adhoc', 'playbook'):
         containerized = True
         if vargs['command'] == 'adhoc':
             vargs['private_data_dir'] = '.'
-    else:
-        containerized = False
+            adhoc_execenv = True
+
 
     if vargs.get('command') in ('start', 'run'):
         if vargs.get('hosts') and not (vargs.get('module') or vargs.get('role')):
@@ -831,7 +843,8 @@ def main(sys_args=None):
                                    receptor_node_id=vargs.get('receptor_node_id'),
                                    containerized=containerized,
                                    container_runtime=vargs.get('container_runtime'),
-                                   container_image=vargs.get('container_image')
+                                   container_image=vargs.get('container_image'),
+                                   adhoc_execenv=adhoc_execenv
                                    )
                 if vargs.get('cmdline'):
                     run_options['cmdline'] = vargs.get('cmdline')
