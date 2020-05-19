@@ -548,8 +548,33 @@ class RunnerConfig(object):
     def wrap_args_with_containerization(self, args):
         new_args = [self.container_runtime]
         new_args.extend(['run', '--rm', '--tty', '--interactive'])
-        new_args.extend(["--workdir", "/runner/project"])
-        new_args.extend(["-v", "{}:/runner:Z".format(self.private_data_dir)])
+        if self.adhoc_execenv:
+            if '-i' in self.cmdline_args:
+                inventory_file_path = self.cmdline_args[self.cmdline_args.index('-i') + 1]
+                if inventory_file_path.startswith('/'):
+                    new_args.extend(["-v", "{}:/{}".format(inventory_file_path, inventory_file_path)])
+                elif not inventory_file_path.endswith(','):
+                    new_args.extend(["-v", "{}:/{}".format(os.path.join(os.path.curdir(), inventory_file_path), inventory_file_path)])
+            new_args.extend(["-v", "{}/.ssh/:/.ssh/:z".format(os.environ['HOME'])])
+            if not os.path.exists(os.path.join(os.environ['HOME'], '.ansible')):
+                os.mkdir(os.path.join(os.environ['HOME'], '.ansible'))
+            new_args.extend(["-v", "{}/.ansible:/.ansible:z".format(os.environ['HOME'])])
+            if os.path.exists('/etc/ssh/ssh_known_hosts'):
+                new_args.extend(["-v", "/etc/ssh/ssh_known_hosts:/etc/ssh/ssh_known_hosts:z"])
+            new_args.extend(
+                ["-v", "{}:{}:z".format(
+                    os.path.dirname(os.environ['SSH_AUTH_SOCK']), 
+                    os.path.dirname(os.environ['SSH_AUTH_SOCK'])
+                )]
+            )
+            new_args.extend(["-e", "SSH_AUTH_SOCK={}".format(os.environ['SSH_AUTH_SOCK'])])
+            new_args.extend(["--userns=keep-id"])
+            new_args.extend(["--pid=host"])
+            new_args.extend(["--ipc=host"])
+            output.debug("CONTAINER INVOCATION:{}".format(new_args))
+        else:
+            new_args.extend(["--workdir", "/runner/project"])
+            new_args.extend(["-v", "{}:/runner:Z".format(self.private_data_dir)])
 
         container_volume_mounts = self.settings.get('container_volume_mounts')
         if container_volume_mounts:
