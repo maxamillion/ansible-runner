@@ -552,21 +552,22 @@ class RunnerConfig(object):
         new_args = [self.container_runtime]
         new_args.extend(['run', '--rm', '--tty', '--interactive'])
         if self.cli_execenv:
+            if self.cli_execenv == 'playbook':
+                # FIXME - this might not be something we can assume
+                # grab the directory relative to the playbook so we capture roles and such
+                playbook_file_path = self.cmdline_args[0]
+                new_args.extend([
+                    "-v", "{}:/{}".format(
+                       os.path.dirname(os.path.abspath(playbook_file_path)),
+                       os.path.dirname(playbook_file_path),
+                    )
+                ])
+
             # volume mount inventory into the exec env container if provided at cli
             if '-i' in self.cmdline_args:
                 inventory_file_path = self.cmdline_args[self.cmdline_args.index('-i') + 1]
-                if inventory_file_path.startswith('/'):
+                if not inventory_file_path.endswith(','):
                     new_args.extend(["-v", "{}:/{}".format(inventory_file_path, inventory_file_path)])
-                elif not inventory_file_path.endswith(','):
-                    new_args.extend(["-v", "{}:/{}".format(inventory_file_path, inventory_file_path)])
-
-            if self.cli_execenv == 'playbook':
-                # FIXME - this might not be something we can assume
-                playbook_file_path = self.cmdline_args[0]
-                if playbook_file_path.startswith('/'):
-                    new_args.extend(["-v", "{}:/{}".format(playbook_file_path, playbook_file_path)])
-                else:
-                    new_args.extend(["-v", "{}:/{}".format(os.path.join(os.path.curdir(), play_file_path), inventory_file_path)])
 
             # volume mount ~/.ssh/ and ~/.ansible into the exec env container
             new_args.extend(["-v", "{}/.ssh/:/.ssh/:z".format(os.environ['HOME'])])
