@@ -617,24 +617,35 @@ def main(sys_args=None):
     # adhoc command exec
     adhoc_subparser = subparser.add_parser(
         'adhoc',
-        help="Check if a an ansible-runner process in the background is still running."
+        help="Run ansible adhoc commands in an Execution Environment"
     )
-#   adhoc_subparser.add_argument(
-#       "hosts",
-#       help="host pattern to execute against"
-#   )
-#   adhoc_subparser.add_argument(
-#       "-m", "--module",
-#       dest=module,
-#       default=DEFAULT_RUNNER_MODULE,
-#       help="invoke an Ansible module directly without a playbook "
-#            "(See Ansible Module Options below)"
-#   )
     adhoc_subparser.add_argument(
         "cmdline",
         nargs=argparse.REMAINDER,
-        help="command line options to pass to ansible-playbook at "
-             "execution time"
+        help="command line options to pass to ansible at execution time"
+    )
+    adhoc_subparser.add_argument(
+        "--private-data-dir",
+        help="base directory cotnaining the ansible-runner metadata "
+             "(project, inventory, env, etc)",
+        default='.'
+    )
+
+    # adhoc command exec
+    playbook_subparser = subparser.add_parser(
+        'playbook',
+        help="Run ansible-playbook commands in an Execution Environment"
+    )
+    playbook_subparser.add_argument(
+        "cmdline",
+        nargs=argparse.REMAINDER,
+        help="command line options to pass to ansible at execution time"
+    )
+    playbook_subparser.add_argument(
+        "--private-data-dir",
+        help="base directory cotnaining the ansible-runner metadata "
+             "(project, inventory, env, etc)",
+        default='.'
     )
 
     # misc args
@@ -655,11 +666,13 @@ def main(sys_args=None):
     stop_runner_group = stop_subparser.add_argument_group(*ansible_runner_group_options)
     isalive_runner_group = isalive_subparser.add_argument_group(*ansible_runner_group_options)
     adhoc_runner_group = adhoc_subparser.add_argument_group(*ansible_runner_group_options)
+    playbook_runner_group = playbook_subparser.add_argument_group(*ansible_runner_group_options)
     add_args_to_parser(run_runner_group, DEFAULT_CLI_ARGS['runner_group'])
     add_args_to_parser(start_runner_group, DEFAULT_CLI_ARGS['runner_group'])
     add_args_to_parser(stop_runner_group, DEFAULT_CLI_ARGS['runner_group'])
     add_args_to_parser(isalive_runner_group, DEFAULT_CLI_ARGS['runner_group'])
     add_args_to_parser(adhoc_runner_group, DEFAULT_CLI_ARGS['runner_group'])
+    add_args_to_parser(playbook_runner_group, DEFAULT_CLI_ARGS['runner_group'])
 
     # mutually exclusive group
     run_mutually_exclusive_group = run_subparser.add_mutually_exclusive_group()
@@ -741,14 +754,12 @@ def main(sys_args=None):
 
     # FIXME - Probably a more elegant way to handle this.
     # set some state about CLI Exec Env 
-    adhoc_execenv = False
+    cli_execenv = None
     containerized = False
 
     if vargs.get('command') in ('adhoc', 'playbook'):
         containerized = True
-        if vargs['command'] == 'adhoc':
-            vargs['private_data_dir'] = '.'
-            adhoc_execenv = True
+        cli_execenv = vargs.get('command')
 
 
     if vargs.get('command') in ('start', 'run'):
@@ -844,7 +855,7 @@ def main(sys_args=None):
                                    containerized=containerized,
                                    container_runtime=vargs.get('container_runtime'),
                                    container_image=vargs.get('container_image'),
-                                   adhoc_execenv=adhoc_execenv
+                                   cli_execenv=cli_execenv
                                    )
                 if vargs.get('cmdline'):
                     run_options['cmdline'] = vargs.get('cmdline')
