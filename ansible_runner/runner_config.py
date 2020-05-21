@@ -580,8 +580,26 @@ class RunnerConfig(object):
             # volume mount inventory into the exec env container if provided at cli
             if '-i' in self.cmdline_args:
                 inventory_file_path = self.cmdline_args[self.cmdline_args.index('-i') + 1]
-                if not inventory_file_path.endswith(','):
-                    new_args.extend(["-v", "{}:/{}:z".format(inventory_file_path, inventory_file_path)])
+                inventory_playbook_share_parent = False
+                if self.cli_execenv == 'playbook':
+                    if os.path.dirname(os.path.abspath(inventory_file_path)) == \
+                            os.path.dirname(os.path.abspath(playbook_file_path)):
+                        inventory_playbook_share_parent = True
+                if not inventory_file_path.endswith(',') and not inventory_playbook_share_parent:
+                    if os.path.isabs(inventory_file_path) and (os.path.dirname(inventory_file_path) != '/'):
+                        new_args.extend([
+                            "-v", "{}:{}:z".format(
+                               os.path.dirname(inventory_file_path),
+                               os.path.dirname(inventory_file_path),
+                            )
+                        ])
+                    else:
+                        new_args.extend([
+                            "-v", "{}:/runner/project/{}:z".format(
+                               os.path.dirname(os.path.abspath(inventory_file_path)),
+                               os.path.dirname(inventory_file_path),
+                            )
+                        ])
 
             # volume mount ~/.ssh/ and ~/.ansible into the exec env container
             new_args.extend(["-v", "{}/.ssh/:/runner/project/.ssh/:z".format(os.environ['HOME'])])

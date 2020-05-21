@@ -34,10 +34,6 @@
         line: "PasswordAuthentication no"
       notify: restart sshd
 
-    - name: run the boinc role
-      import_role:
-        name: worldcommunitygrid
-
   handlers:
     - name: restart sshd
       service:
