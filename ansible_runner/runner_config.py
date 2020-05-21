@@ -381,8 +381,14 @@ class RunnerConfig(object):
         will generate the ``ansible`` or ``ansible-playbook`` command that will be used by the
         :py:class:`ansible_runner.runner.Runner` object to start the process
         """
+        # FIXME - this never happens because the conditional in prepare_command
+        #         "branches around it" and I need to figure out if that's the
+        #         correct course of action or not.
         if self.cli_execenv:
-            base_command = 'ansible'
+            if self.cli_execenv == 'adhoc':
+                base_command = 'ansible'
+            elif self.cli_execenv == 'playbook':
+                base_command = 'ansible-playbook'
             self.execution_mode = ExecutionMode.CLI_EXECENV
         elif self.binary is not None:
             base_command = self.binary
@@ -556,24 +562,32 @@ class RunnerConfig(object):
                 # FIXME - this might not be something we can assume
                 # grab the directory relative to the playbook so we capture roles and such
                 playbook_file_path = self.cmdline_args[0]
-                new_args.extend([
-                    "-v", "{}:/{}".format(
-                       os.path.dirname(os.path.abspath(playbook_file_path)),
-                       os.path.dirname(playbook_file_path),
-                    )
-                ])
+                if os.path.isabs(playbook_file_path) and (os.path.dirname(playbook_file_path) != '/'):
+                    new_args.extend([
+                        "-v", "{}:{}:z".format(
+                           os.path.dirname(playbook_file_path),
+                           os.path.dirname(playbook_file_path),
+                        )
+                    ])
+                else:
+                    new_args.extend([
+                        "-v", "{}:/runner/project/{}:z".format(
+                           os.path.dirname(os.path.abspath(playbook_file_path)),
+                           os.path.dirname(playbook_file_path),
+                        )
+                    ])
 
             # volume mount inventory into the exec env container if provided at cli
             if '-i' in self.cmdline_args:
                 inventory_file_path = self.cmdline_args[self.cmdline_args.index('-i') + 1]
                 if not inventory_file_path.endswith(','):
-                    new_args.extend(["-v", "{}:/{}".format(inventory_file_path, inventory_file_path)])
+                    new_args.extend(["-v", "{}:/{}:z".format(inventory_file_path, inventory_file_path)])
 
             # volume mount ~/.ssh/ and ~/.ansible into the exec env container
-            new_args.extend(["-v", "{}/.ssh/:/.ssh/:z".format(os.environ['HOME'])])
+            new_args.extend(["-v", "{}/.ssh/:/runner/project/.ssh/:z".format(os.environ['HOME'])])
             if not os.path.exists(os.path.join(os.environ['HOME'], '.ansible')):
                 os.mkdir(os.path.join(os.environ['HOME'], '.ansible'))
-            new_args.extend(["-v", "{}/.ansible:/.ansible:z".format(os.environ['HOME'])])
+            new_args.extend(["-v", "{}/.ansible:/runner/project/.ansible:z".format(os.environ['HOME'])])
 
             # volume mount system-wide ssh_known_hosts the exec env container
             if os.path.exists('/etc/ssh/ssh_known_hosts'):
@@ -594,8 +608,9 @@ class RunnerConfig(object):
             new_args.extend(["--ipc=host"])
 
         else:
-            new_args.extend(["--workdir", "/runner/project"])
             new_args.extend(["-v", "{}:/runner:Z".format(self.private_data_dir)])
+
+        new_args.extend(["--workdir", "/runner/project"])
 
         container_volume_mounts = self.settings.get('container_volume_mounts')
         if container_volume_mounts:
