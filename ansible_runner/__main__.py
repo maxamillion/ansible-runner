@@ -413,7 +413,7 @@ DEFAULT_CLI_ARGS = {
             ("--container-image",),
             dict(
                 dest="container_image",
-                default="quay.io/ansible/ansible-runner:devel",
+                default="localhost/execenv",
                 help="Container image to use when running an ansible task"
             )
         ),
