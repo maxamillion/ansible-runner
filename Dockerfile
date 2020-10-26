@@ -68,5 +68,7 @@ RUN pip3 install --no-cache-dir /tmp/ansible-runner-${RUNNER_VERSION}.tar.gz
 #TODO optionally install ansible from rpm
 #ADD https://releases.ansible.com/ansible-runner/ansible-runner.el8.repo /etc/yum.repos.d/ansible-runner.repo
 
-ARG ANSIBLE_BRANCH=devel
-RUN pip3 install --no-cache-dir https://github.com/ansible/ansible/archive/${ANSIBLE_BRANCH}.tar.gz
+#ARG ANSIBLE_BRANCH=devel
+#RUN pip3 install --no-cache-dir https://github.com/ansible/ansible/archive/${ANSIBLE_BRANCH}.tar.gz
+RUN pip3 install --no-cache-dir https://github.com/maxamillion/ansible/archive/test/pr/67435.tar.gz
+
